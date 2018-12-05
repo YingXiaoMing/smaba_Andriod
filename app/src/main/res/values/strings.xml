@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">My Application2</string>
+    <string name="IP地址">IP地址</string>
+    <string name="http_192_168_18_28">http://192.168.18.28</string>
+    <string name="端口号">端口号</string>
+    <string name="端口">端口</string>
+</resources>
