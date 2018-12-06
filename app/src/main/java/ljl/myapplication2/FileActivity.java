@@ -18,6 +18,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.github.barteksc.pdfviewer.PDFView;
+
 import java.io.File;
 import java.util.ArrayList;
 
@@ -30,6 +32,7 @@ public class FileActivity extends AppCompatActivity {
     private Handler mHandler;
     private ArrayList<FileEntity> mList;
     private File currentFile;
+    private PDFView pdfView;
     String sdRootPath;
 
     public FileActivity() {
@@ -64,13 +67,14 @@ public class FileActivity extends AppCompatActivity {
         mList = new ArrayList<>();
 //        sdRootPath = Environment.getDataDirectory().getPath();
         if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)){
-            System.out.println("faker lobeee");
+            System.out.println("成功获取到SD设备");
             sdRootPath = Environment.getExternalStorageDirectory().getPath();
 //            sdRootPath = Environment.getRootDirectory().getAbsolutePath();
         }
 //        sdRootPath = Environment.getRootDirectory().getAbsolutePath();
 //        sdRootPath = sdRootPath.substring(0,sdRootPath.length()-1);
         System.out.println("内置SD卡位置:"+sdRootPath);
+        pdfView = findViewById(R.id.pdfView);
         currentFile = new File(sdRootPath);
         initView();
         getData(sdRootPath);
@@ -88,6 +92,11 @@ public class FileActivity extends AppCompatActivity {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
+                            currentFile = new File(entity.getFilePath());
+                            pdfView.fromFile(currentFile)
+                                    .defaultPage(0)
+                                    .enableAnnotationRendering(true)
+                                    .load();
 //                            Toast.makeText(mContext, entity.getFilePath()+"  "+entity.getFileName(), 1).show();
                         }
                     });
