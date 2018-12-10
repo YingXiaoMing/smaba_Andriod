@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
@@ -13,35 +12,39 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.github.barteksc.pdfviewer.PDFView;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 
-import jcifs.smb.FileEntry;
+import jcifs.Config;
+import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SmbException;
+import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileInputStream;
+import jcifs.smb.SmbFileOutputStream;
 
-public class FileActivity extends AppCompatActivity {
+public class smbActivity extends AppCompatActivity {
     private ListView mListView;
     private MyFileAdapter mAdapter;
     private Context mContext;
-    private Handler mHandler;
     private ArrayList<FileEntity> mList;
-    private File currentFile;
+    private Handler mHandler;
     private PDFView pdfView;
-    String sdRootPath;
 
-    public FileActivity() {
-    }
+
 
     @SuppressLint("HandlerLeak")
     @Override
-    protected  void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.file_activity);
@@ -61,94 +64,95 @@ public class FileActivity extends AppCompatActivity {
                     case 2:
                         break;
                     default:
-                            break;
+                        break;
                 }
             }
         };
         mContext = this;
         mList = new ArrayList<>();
-//        sdRootPath = Environment.getDataDirectory().getPath();
-        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)){
-            System.out.println("成功获取到SD设备");
-            sdRootPath = Environment.getExternalStorageDirectory().getPath();
-//            sdRootPath = Environment.getRootDirectory().getAbsolutePath();
-        }
-//        sdRootPath = Environment.getRootDirectory().getAbsolutePath();
-//        sdRootPath = sdRootPath.substring(0,sdRootPath.length()-1);
-        System.out.println("内置SD卡位置:"+sdRootPath);
         pdfView = findViewById(R.id.pdfView);
-        currentFile = new File(sdRootPath);
         initView();
-        getData(sdRootPath);
+        getData();
     }
-    private  void initView() {
-        mListView = (ListView)findViewById(R.id.listView1);
+    private void getData() {
+        new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                connectSmbFile();
+            }
+        }.start();
+    }
+    public void connectSmbFile() {
+        mList.clear();
+        new Thread() {
+            public void run() {
+                try {
+                    Config.registerSmbURLHandler();
+                    String user = "ljl";
+                    String pass = "Aa!123456";
+                    String path="smb://192.168.16.40/ftp/";
+                    NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication("",user, pass);
+                    SmbFile smbFile = new SmbFile(path,auth);
+                    SmbFile[] files = smbFile.listFiles();
+                    for (SmbFile f : files) {
+                        FileEntity entity2 = new FileEntity();
+                        boolean isDir =  f.isDirectory();
+                        if (isDir == true) {
+                            entity2.setFileType(FileEntity.Type.Floder);
+                        }else {
+                            entity2.setFileType(FileEntity.Type.FILE);
+                        }
+                        entity2.setFileName(f.getName());
+                        entity2.setFilePath(f.getCanonicalPath());
+                        entity2.setFileSize(f.length()+"");
+                        mList.add(entity2);
+                    }
+                    mHandler.sendEmptyMessage(1);
+//                    mainHeader.post(runnableUi);
+                }catch(Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+    }
+
+    private void initView() {
+        mListView = findViewById(R.id.listView1);
         mListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 final FileEntity entity = mList.get(position);
-                if (entity.getFileType() == FileEntity.Type.FILE.Floder) {
-                    currentFile = new File(entity.getFilePath());
-                    getData(entity.getFilePath());
-                }else if (entity.getFileType() == FileEntity.Type.FILE) {
+                if (entity.getFileType() == FileEntity.Type.FILE) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            currentFile = new File(entity.getFilePath());
-                            pdfView.fromFile(currentFile)
-                                    .defaultPage(0)
-                                    .enableAnnotationRendering(true)
-                                    .load();
-//                            Toast.makeText(mContext, entity.getFilePath()+"  "+entity.getFileName(), 1).show();
+                            File currentFile = new File(convertSmbFileToFile(entity.getFilePath()));
+//                            InputStream is =
+//                            pdfView.fromFile(currentFile)
+//                                    .defaultPage(0)
+//                                    .enableAnnotationRendering(true)
+//                                    .load();
+//                            pdfView.fromStream(currentFile).load();
                         }
                     });
                 }
             }
         });
-    }
-    //查找path地址下所有文件
-    public  void findAllFiles(String path) {
-        mList.clear();
-        if (path == null || path.equals("")){
-            return;
-        }
-        File fatherFile = new File(path);
-        File[] files = fatherFile.listFiles();
-        if (!sdRootPath.equals(currentFile.getAbsolutePath())) {
-            FileEntity entity2 = new FileEntity();
-            entity2.setFileType(FileEntity.Type.Floder);
-            entity2.setFileName("...");
-            String parentPath = currentFile.getParent();
-            entity2.setFilePath(parentPath);
-            mList.add(entity2);
-        }
-        if (files != null && files.length > 0) {
-            for (int i =0;i<files.length;i++) {
-                FileEntity entity = new FileEntity();
-                boolean isDirectory = files[i].isDirectory();
-                if(isDirectory == true){
-                    entity.setFileType(FileEntity.Type.Floder);
-                }else {
-                    entity.setFileType(FileEntity.Type.FILE);
-                }
-                entity.setFileName(files[i].getName().toString());
-                entity.setFilePath(files[i].getAbsolutePath());
-                entity.setFileSize(files[i].length()+"");
-                mList.add(entity);
-            }
-        }
-        mHandler.sendEmptyMessage(1);
-    }
-    private  void getData(final String path) {
-        new Thread() {
-            @Override
-            public  void run() {
-                super.run();
-                findAllFiles(path);
-            }
-        }.start();
-    }
 
+    }
+    public static String convertSmbFileToFile(String smbFileCanonicalPath) {
+        String[] tempVar = smbFileCanonicalPath.substring(6).replace("$", ":").split("/");
+        String bar = "\\";
+        String finalDirectory = "";
+        for (int i = 1; i < tempVar.length; i++) {
+            finalDirectory += tempVar[i] + bar;
+            if (i == tempVar.length - 1) {
+                finalDirectory = finalDirectory.substring(0,finalDirectory.length()-1);
+            }
+        }
+        return finalDirectory;
+    }
     class MyFileAdapter extends BaseAdapter {
         private Context mContext;
         private ArrayList<FileEntity> mAList;
