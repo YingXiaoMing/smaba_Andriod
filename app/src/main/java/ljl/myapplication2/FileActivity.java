@@ -13,18 +13,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
-
 import com.github.barteksc.pdfviewer.PDFView;
 
 import java.io.File;
 import java.util.ArrayList;
 
-import jcifs.smb.FileEntry;
 
 public class FileActivity extends AppCompatActivity {
     private ListView mListView;
@@ -34,6 +30,7 @@ public class FileActivity extends AppCompatActivity {
     private ArrayList<FileEntity> mList;
     private File currentFile;
     private PDFView pdfView;
+    private String machineNum;
     String sdRootPath;
 
     public FileActivity() {
