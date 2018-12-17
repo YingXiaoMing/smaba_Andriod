@@ -10,7 +10,9 @@ import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -24,13 +26,17 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
 import com.github.barteksc.pdfviewer.listener.OnRenderListener;
 
 import org.angmarch.views.NiceSpinner;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -38,6 +44,7 @@ import java.util.List;
 import jcifs.Config;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileInputStream;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -48,7 +55,6 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private PDFView pdfView;
     private String rootPath;
-    private String currentPath;
     private NtlmPasswordAuthentication auth;
     private ProgressDialog progressDialog;
     private int mYear,mMonth,mDay;
@@ -61,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private AlertDialog alertDialog2; //单选框
     private String[] dialogItem = new String[0];
     private int machineIndex = 0;
-
+    private String machinePassword;
 
     @SuppressLint("HandlerLeak")
     @Override
@@ -103,43 +109,33 @@ public class MainActivity extends AppCompatActivity {
         mMonth = ca.get(Calendar.MONTH);
         mDay = ca.get(Calendar.DAY_OF_MONTH);
         transferNewDate(mYear,mMonth,mDay);
+        getMachinePassword(rootPath+"password.txt");
         btn_setting = findViewById(R.id.btn_setting);
         btn_setting.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (dialogItem.length > 0) {
-                    AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this);
-                    alertBuilder.setTitle("机台设置");
-                    alertBuilder.setSingleChoiceItems(dialogItem, machineIndex, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            machineIndex = which;
-                        }
-                    });
-                    alertBuilder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            machineNum = dialogItem[machineIndex];
-                            mHandler.post(updateMachineNum);
-                            replaceMachineNum();
-                            alertDialog2.dismiss();
-                        }
-                    });
-                    alertBuilder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            alertDialog2.dismiss();
-                        }
-                    });
-                    alertDialog2 = alertBuilder.create();
-                    alertDialog2.show();
-                }else {
-                    Toast toast =Toast.makeText(MainActivity.this,"此日期暂无机台",Toast.LENGTH_SHORT);
-                    toast.setGravity(Gravity.CENTER,0,0);
-                    toast.show();
-                }
+                        new MaterialDialog.Builder(MainActivity.this)
+                                .title("访问密码")
+                                .inputType(InputType.TYPE_MASK_VARIATION)
+                                .input("", null, new MaterialDialog.InputCallback() {
+                                    @Override
+                                    public void onInput(@NonNull MaterialDialog dialog, CharSequence input) {
+                                        String iString = input.toString();
+                                        if (iString.equals(machinePassword)) {
+                                            connectGetData();
+                                        }else {
+                                            Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
+                                            toast.setGravity(Gravity.CENTER,0,0);
+                                            toast.show();
+                                        }
+                                    }
+                                })
+                                .positiveText("确定")
+                                .negativeText("取消")
+                                .show();
 
-            }
+
+                }
         });
 
 
@@ -169,13 +165,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         initView();
-        connectGetData();
     }
-
     private void connectGetData() {
-        getMachineListData(rootPath + smb_Date + '/');
+        getMachineListData(rootPath + "config.txt");
     }
-
     private void replaceMachineNum() {
         String ban = niceSpinner.getText().toString();
         String banPath;
@@ -184,7 +177,31 @@ public class MainActivity extends AppCompatActivity {
         }else {
             banPath = "N/";
         }
-        getData(rootPath + smb_Date + '/' + dialogItem[machineIndex] + '/' + banPath);
+        if (dialogItem.length > 0) {
+            getData(rootPath + smb_Date + "/" + dialogItem[machineIndex] + "/" + banPath);
+        }else {
+            getData(rootPath + smb_Date + "/无/" + banPath );
+        }
+    }
+
+    private void getMachinePassword(final String jPath) {
+        new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                try {
+                    Config.registerSmbURLHandler();
+                    SmbFile smbFile = new SmbFile(jPath,auth);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(new SmbFileInputStream(smbFile)));
+                    machinePassword = reader.readLine();
+                }catch (Exception e) {
+                    Toast toast = Toast.makeText(MainActivity.this, "获取服务器密码失败", Toast.LENGTH_SHORT);
+                    toast.setGravity(Gravity.CENTER,0,0);
+                    toast.show();
+                    e.printStackTrace();
+                }
+            }
+        }.start();
     }
 
     private void getMachineListData(final String nPath) {
@@ -195,33 +212,62 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Config.registerSmbURLHandler();
                     SmbFile smbFile = new SmbFile(nPath,auth);
-                    dialogItem = smbFile.list();
-                    String appendText;
-                    if (dialogItem.length > 0){
-                        machineNum = dialogItem[0];
-                        mHandler.post(updateMachineNum);
-                        appendText = dialogItem[0];
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(new SmbFileInputStream(smbFile)));
+                    String line = reader.readLine();
+                    dialogItem = line.split(",");
+                    if (dialogItem.length > 0) {
+                        mHandler.post(createAlertDialog);
                     }else {
-                        machineNum = "无";
-                        mHandler.post(updateMachineNum);
-                        appendText = "无";
+                        Toast toast =Toast.makeText(MainActivity.this,"请查看配置文件或者联系管理员",Toast.LENGTH_SHORT);
+                        toast.setGravity(Gravity.CENTER,0,0);
+                        toast.show();
                     }
-                    String ban = niceSpinner.getText().toString();
-                    String banPath;
-                    if (ban == "白班") {
-                        banPath = "D/";
-                    }else {
-                        banPath = "N/";
-                    }
-                    getData(rootPath + smb_Date + '/' + appendText + '/' + banPath);
                 }catch (Exception e){
-                    machineNum = "无";
-                    mHandler.post(updateMachineNum);
+                    mHandler.post(UpdateMachineNumError);
                     e.printStackTrace();
                 }
             }
         }.start();
     }
+    Runnable createAlertDialog = new Runnable() {
+        @Override
+        public void run() {
+            AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this);
+            alertBuilder.setTitle("机台设置");
+            alertBuilder.setSingleChoiceItems(dialogItem, machineIndex, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    machineIndex = which;
+                }
+            });
+            alertBuilder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    machineNum = dialogItem[machineIndex];
+                    mHandler.post(updateMachineNum);
+                    replaceMachineNum();
+                    alertDialog2.dismiss();
+                }
+            });
+            alertBuilder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    alertDialog2.dismiss();
+                }
+            });
+            alertDialog2 = alertBuilder.create();
+            alertDialog2.show();
+        }
+    };
+    Runnable UpdateMachineNumError = new Runnable() {
+        @Override
+        public void run() {
+            machineView.setText(machineNum);
+            Toast toast = Toast.makeText(MainActivity.this,"发生异常错误，请联系管理员处理",Toast.LENGTH_SHORT);
+            toast.setGravity(Gravity.CENTER,0,0);
+            toast.show();
+        }
+    };
 
     Runnable updateMachineNum = new Runnable() {
         @Override
@@ -229,13 +275,6 @@ public class MainActivity extends AppCompatActivity {
             machineView.setText(machineNum);
         }
     };
-    Runnable updateDate = new Runnable() {
-        @Override
-        public void run() {
-
-        }
-    };
-
     private void transferNewDate(int nYear,int nMonth, int nDay) {
         String days;
         if (mMonth + 1 <10) {
@@ -269,7 +308,8 @@ public class MainActivity extends AppCompatActivity {
             mMonth = month;
             mDay = dayOfMonth;
             transferNewDate(mYear,mMonth,mDay);
-            connectGetData();
+            replaceMachineNum();
+//            connectGetData();
         }
     };
     private void getData(final String newPath) {
