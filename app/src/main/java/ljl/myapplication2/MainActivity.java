@@ -8,7 +8,9 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -18,25 +20,39 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.DatePicker;
 import android.widget.ImageView;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
 import com.github.barteksc.pdfviewer.listener.OnRenderListener;
+import com.github.barteksc.pdfviewer.util.FileUtils;
+
+import net.sf.json.JSON;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
 
 import org.angmarch.views.NiceSpinner;
+import org.apache.commons.lang.StringEscapeUtils;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -45,7 +61,6 @@ import jcifs.Config;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileInputStream;
-
 
 public class MainActivity extends AppCompatActivity {
     private ListView mListView;
@@ -68,7 +83,9 @@ public class MainActivity extends AppCompatActivity {
     private String[] dialogItem = new String[0];
     private int machineIndex = 0;
     private String machinePassword;
-
+    private JSONArray machineViewList;
+    private JSONArray napkinViewList;
+    private JSONArray padViewList;
     @SuppressLint("HandlerLeak")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,6 +94,26 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.file_activity);
         String user = "ljl";
         String pass = "Aa!123456";
+        List<String> mdata = new ArrayList<>();
+        for (int i = 0; i < 5;i++){
+            mdata.add("test"+i);
+        }
+//        ListView listView1 = (ListView) findViewById(R.id.machineView);
+//        listView1.setChoiceMode(listView1.CHOICE_MODE_SINGLE);
+//        ListAdapter adapter = new ArrayAdapter<String>(this,R.layout.radio_item,mdata) {
+//            @Override
+//            public View getView(int position, View convertView, ViewGroup parent) {
+//                final ChoiceView view;
+//                if(convertView == null) {
+//                    view = new ChoiceView(MainActivity.this);
+//                }else {
+//                    view = (ChoiceView)convertView;
+//                }
+//                view.setText(getItem(position));
+//                return view;
+//            }
+//        };
+//        listView1.setAdapter(adapter);
         auth = new NtlmPasswordAuthentication("",user, pass);
         mHandler = new Handler() {
             @Override
@@ -109,11 +146,12 @@ public class MainActivity extends AppCompatActivity {
         mMonth = ca.get(Calendar.MONTH);
         mDay = ca.get(Calendar.DAY_OF_MONTH);
         transferNewDate(mYear,mMonth,mDay);
-        getMachinePassword(rootPath+"password.txt");
+
         btn_setting = findViewById(R.id.btn_setting);
         btn_setting.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                        getMachineAndPassword(rootPath+"config.json");
                         new MaterialDialog.Builder(MainActivity.this)
                                 .title("访问密码")
                                 .inputType(InputType.TYPE_MASK_VARIATION)
@@ -184,20 +222,63 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void getMachinePassword(final String jPath) {
+    //从共享目录下载
+    private static String smbGet(String remoteUrl,NtlmPasswordAuthentication auth) {
+        InputStream in = null;
+        OutputStream out = null;
+        String newFilePath = null;
+        try {
+            Config.registerSmbURLHandler();
+            SmbFile remoteFile = new SmbFile(remoteUrl,auth);
+            if (remoteFile == null) {
+                System.out.println("密码文件不存在");
+                return "";
+            }
+            String fileName = remoteFile.getName();
+            String sdRootPath = Environment.getExternalStorageDirectory().getPath();
+            newFilePath = sdRootPath + File.separator + fileName;
+            File localFile = new File(newFilePath);
+            in = new BufferedInputStream(new SmbFileInputStream(remoteFile));
+            out = new BufferedOutputStream(new FileOutputStream(localFile));
+            byte[] buffer = new byte[1024];
+            while (in.read(buffer) != -1) {
+                out.write(buffer);
+                buffer = new byte[1024];
+            }
+        }catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                out.close();
+                in.close();
+            }catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return newFilePath;
+    }
+
+    private void getMachineAndPassword(final String jPath) {
         new Thread() {
             @Override
             public void run() {
                 super.run();
                 try {
-                    Config.registerSmbURLHandler();
-                    SmbFile smbFile = new SmbFile(jPath,auth);
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(new SmbFileInputStream(smbFile)));
-                    machinePassword = reader.readLine();
+                    String filePath = smbGet(jPath,auth);
+                    String content = org.apache.commons.io.FileUtils.readFileToString(new File(filePath), "UTF-8");
+                    JSONObject jsonObject = JSONObject.fromObject(content);
+//                    JSONObject newObj = JSONObject.fromObject(json);
+                    machinePassword = (String) jsonObject.get("password");
+//                    JSONArray machineList = jsonObject.getJSONArray("machine");
+                    machineViewList = jsonObject.getJSONArray("machine");
+                    napkinViewList = jsonObject.getJSONArray("napkin");
+                    padViewList = jsonObject.getJSONArray("pad");
                 }catch (Exception e) {
+                    Looper.prepare();
                     Toast toast = Toast.makeText(MainActivity.this, "获取服务器密码失败", Toast.LENGTH_SHORT);
                     toast.setGravity(Gravity.CENTER,0,0);
                     toast.show();
+                    Looper.loop();
                     e.printStackTrace();
                 }
             }
@@ -233,13 +314,55 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this);
-            alertBuilder.setTitle("机台设置");
-            alertBuilder.setSingleChoiceItems(dialogItem, machineIndex, new DialogInterface.OnClickListener() {
+            View myView = View.inflate(mContext,R.layout.dialog_item,null);
+            List<String> mdata = new ArrayList<>();
+            for (int i=0;i<5;i++) {
+                mdata.add("test"+i);
+            }
+            ListView listView1 = myView.findViewById(R.id.machineView);
+            listView1.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+            final SubjectAdapter adapter1 = new SubjectAdapter(machineViewList,MainActivity.this);
+            listView1.setAdapter(adapter1);
+            ListView listView2 = myView.findViewById(R.id.napkinView);
+            listView2.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+            final ListAdapter adapter2 = new ArrayAdapter<String>(MainActivity.this,R.layout.radio_item,napkinViewList) {
                 @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    machineIndex = which;
+                public View getView(int position, View convertView, ViewGroup parent) {
+                    final ChoiceView view;
+                    if(convertView == null) {
+                        view = new ChoiceView(MainActivity.this);
+                    }else {
+                        view = (ChoiceView)convertView;
+                    }
+                    view.setText(getItem(position));
+                    return view;
+                }
+            };
+            listView2.setAdapter(adapter2);
+
+            ListView listView3 = myView.findViewById(R.id.padView);
+            listView3.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+            ListAdapter adapter3 = new ArrayAdapter<String>(MainActivity.this,R.layout.radio_item,padViewList) {
+                @Override
+                public View getView(int position, View convertView, ViewGroup parent) {
+                    final ChoiceView view;
+                    if(convertView == null) {
+                        view = new ChoiceView(MainActivity.this);
+                    }else {
+                        view = (ChoiceView)convertView;
+                    }
+                    view.setText(getItem(position));
+                    return view;
+                }
+            };
+            listView2.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    adapter1.SetClear();
                 }
             });
+            listView3.setAdapter(adapter3);
+            alertBuilder.setTitle("机台设置");
             alertBuilder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -256,6 +379,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             alertDialog2 = alertBuilder.create();
+            alertDialog2.setView(myView);
             alertDialog2.show();
         }
     };
@@ -309,7 +433,6 @@ public class MainActivity extends AppCompatActivity {
             mDay = dayOfMonth;
             transferNewDate(mYear,mMonth,mDay);
             replaceMachineNum();
-//            connectGetData();
         }
     };
     private void getData(final String newPath) {
