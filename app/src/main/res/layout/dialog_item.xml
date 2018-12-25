@@ -11,35 +11,41 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:baselineAligned="false"
-            android:background="@drawable/border">
+            >
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_weight="1.0"
                 android:layout_height="40dp"
+                android:background="@drawable/border"
                 >
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:text="机型号码"
+                    android:id="@+id/machineName1"
+                    android:text="尿裤"
                     android:gravity="center"/>
             </LinearLayout>
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_weight="1.0"
-                android:layout_height="40dp">
+                android:layout_height="40dp"
+                android:background="@drawable/border">
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:id="@+id/machineName2"
                     android:text="卫生巾"
                     android:gravity="center"/>
             </LinearLayout>
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_weight="1.0"
-                android:layout_height="40dp">
+                android:layout_height="40dp"
+                android:background="@drawable/border">
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:id="@+id/machineName3"
                     android:text="护垫"
                     android:gravity="center"/>
             </LinearLayout>
@@ -78,6 +84,7 @@
                     android:layout_weight="1"
                     android:id="@+id/padView"></ListView>
             </LinearLayout>
+
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
@@ -86,15 +93,16 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textSize="20dp"
                 android:text="密码:"/>
             <EditText
-                android:id="@+id/et_password"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:hint="请输入密码"
                 android:inputType="textPassword"
-                />
+                android:id="@+id/ed_password"/>
         </LinearLayout>
+
     </LinearLayout>
 </android.support.constraint.ConstraintLayout>

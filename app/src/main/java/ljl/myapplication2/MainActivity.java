@@ -6,6 +6,7 @@ import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Environment;
@@ -15,14 +16,18 @@ import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.DatePicker;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
@@ -55,6 +60,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Iterator;
 import java.util.List;
 
 import jcifs.Config;
@@ -78,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
     private String machineNum;
     private TextView machineView;
     private NiceSpinner niceSpinner;
-    private TextView btn_setting;
     private AlertDialog alertDialog2; //单选框
     private String[] dialogItem = new String[0];
     private int machineIndex = 0;
@@ -86,35 +91,25 @@ public class MainActivity extends AppCompatActivity {
     private JSONArray machineViewList;
     private JSONArray napkinViewList;
     private JSONArray padViewList;
+    private String machineName1 = "尿裤";
+    private String machineName2 = "卫生巾";
+    private String machineName3 = "护垫";
     @SuppressLint("HandlerLeak")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+//        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.file_activity);
         String user = "ljl";
         String pass = "Aa!123456";
-        List<String> mdata = new ArrayList<>();
-        for (int i = 0; i < 5;i++){
-            mdata.add("test"+i);
-        }
-//        ListView listView1 = (ListView) findViewById(R.id.machineView);
-//        listView1.setChoiceMode(listView1.CHOICE_MODE_SINGLE);
-//        ListAdapter adapter = new ArrayAdapter<String>(this,R.layout.radio_item,mdata) {
-//            @Override
-//            public View getView(int position, View convertView, ViewGroup parent) {
-//                final ChoiceView view;
-//                if(convertView == null) {
-//                    view = new ChoiceView(MainActivity.this);
-//                }else {
-//                    view = (ChoiceView)convertView;
-//                }
-//                view.setText(getItem(position));
-//                return view;
-//            }
-//        };
-//        listView1.setAdapter(adapter);
         auth = new NtlmPasswordAuthentication("",user, pass);
+        machineView = (TextView) findViewById(R.id.machineNum);
+        SharedPreferences sharedPreferences = getSharedPreferences("ljl",Context.MODE_PRIVATE);
+        String machineName = sharedPreferences.getString("machineNum","");
+        if (machineName != "") {
+            machineNum = machineName;
+            machineView.setText(machineNum);
+        }
         mHandler = new Handler() {
             @Override
             public void handleMessage(Message msg) {
@@ -139,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
         mList = new ArrayList<>();
         pdfView = findViewById(R.id.pdfView);
         btn_date = findViewById(R.id.btn_date);
-        machineView = (TextView) findViewById(R.id.machineNum);
+
         rootPath = "smb://192.168.16.40/ftp/";
         Calendar ca = Calendar.getInstance();
         mYear = ca.get(Calendar.YEAR);
@@ -147,34 +142,34 @@ public class MainActivity extends AppCompatActivity {
         mDay = ca.get(Calendar.DAY_OF_MONTH);
         transferNewDate(mYear,mMonth,mDay);
 
-        btn_setting = findViewById(R.id.btn_setting);
-        btn_setting.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                        getMachineAndPassword(rootPath+"config.json");
-                        new MaterialDialog.Builder(MainActivity.this)
-                                .title("访问密码")
-                                .inputType(InputType.TYPE_MASK_VARIATION)
-                                .input("", null, new MaterialDialog.InputCallback() {
-                                    @Override
-                                    public void onInput(@NonNull MaterialDialog dialog, CharSequence input) {
-                                        String iString = input.toString();
-                                        if (iString.equals(machinePassword)) {
-                                            connectGetData();
-                                        }else {
-                                            Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
-                                            toast.setGravity(Gravity.CENTER,0,0);
-                                            toast.show();
-                                        }
-                                    }
-                                })
-                                .positiveText("确定")
-                                .negativeText("取消")
-                                .show();
-
-
-                }
-        });
+//        btn_setting = findViewById(R.id.btn_setting);
+//        btn_setting.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                        getMachineAndPassword(rootPath+"config.json");
+//                        new MaterialDialog.Builder(MainActivity.this)
+//                                .title("访问密码")
+//                                .inputType(InputType.TYPE_MASK_VARIATION)
+//                                .input("", null, new MaterialDialog.InputCallback() {
+//                                    @Override
+//                                    public void onInput(@NonNull MaterialDialog dialog, CharSequence input) {
+//                                        String iString = input.toString();
+//                                        if (iString.equals(machinePassword)) {
+//                                            connectGetData();
+//                                        }else {
+//                                            Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
+//                                            toast.setGravity(Gravity.CENTER,0,0);
+//                                            toast.show();
+//                                        }
+//                                    }
+//                                })
+//                                .positiveText("确定")
+//                                .negativeText("取消")
+//                                .show();
+//
+//
+//                }
+//        });
 
 
         btn_date.setOnClickListener(new View.OnClickListener() {
@@ -203,6 +198,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         initView();
+
+        machineView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showProgressDialog(MainActivity.this,"加载中...");
+                getMachineAndPassword(rootPath+"config.json");
+
+            }
+        });
     }
     private void connectGetData() {
         getMachineListData(rootPath + "config.txt");
@@ -215,8 +219,8 @@ public class MainActivity extends AppCompatActivity {
         }else {
             banPath = "N/";
         }
-        if (dialogItem.length > 0) {
-            getData(rootPath + smb_Date + "/" + dialogItem[machineIndex] + "/" + banPath);
+        if (machineNum != null) {
+            getData(rootPath + smb_Date + "/" + machineNum + "/" + banPath);
         }else {
             getData(rootPath + smb_Date + "/无/" + banPath );
         }
@@ -267,12 +271,31 @@ public class MainActivity extends AppCompatActivity {
                     String filePath = smbGet(jPath,auth);
                     String content = org.apache.commons.io.FileUtils.readFileToString(new File(filePath), "UTF-8");
                     JSONObject jsonObject = JSONObject.fromObject(content);
-//                    JSONObject newObj = JSONObject.fromObject(json);
-                    machinePassword = (String) jsonObject.get("password");
-//                    JSONArray machineList = jsonObject.getJSONArray("machine");
-                    machineViewList = jsonObject.getJSONArray("machine");
-                    napkinViewList = jsonObject.getJSONArray("napkin");
-                    padViewList = jsonObject.getJSONArray("pad");
+                    JSONArray machineType = jsonObject.getJSONArray("machineType");
+                    for (int i=0;i<machineType.size();i++) {
+                        JSONObject sj = machineType.getJSONObject(i);
+                        switch (i) {
+                            case 0:
+                                machineName1 = sj.getString("typeName");
+                                machineViewList = sj.getJSONArray("child");
+                                break;
+                            case 1:
+                                machineName2 = sj.getString("typeName");
+                                napkinViewList = sj.getJSONArray("child");
+                                break;
+                            case 2:
+                                machineName3 = sj.getString("typeName");
+                                padViewList = sj.getJSONArray("child");
+                        }
+                    }
+
+
+
+                    machinePassword = (String) jsonObject.get("密码");
+//                    machineViewList = jsonObject.getJSONArray("尿裤");
+//                    napkinViewList = jsonObject.getJSONArray("卫生巾");
+//                    padViewList = jsonObject.getJSONArray("护垫");
+                    mHandler.post(createAlertDialog);
                 }catch (Exception e) {
                     Looper.prepare();
                     Toast toast = Toast.makeText(MainActivity.this, "获取服务器密码失败", Toast.LENGTH_SHORT);
@@ -314,73 +337,98 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this);
-            View myView = View.inflate(mContext,R.layout.dialog_item,null);
-            List<String> mdata = new ArrayList<>();
-            for (int i=0;i<5;i++) {
-                mdata.add("test"+i);
-            }
+            String machineViewNum = machineView.getText().toString();
+            final View myView = View.inflate(mContext,R.layout.dialog_item,null);
+            TextView textView1 = myView.findViewById(R.id.machineName1);
+            textView1.setText(machineName1);
+            TextView textView2 = myView.findViewById(R.id.machineName2);
+            textView2.setText(machineName2);
+            TextView textView3 = myView.findViewById(R.id.machineName3);
+            textView3.setText(machineName3);
             ListView listView1 = myView.findViewById(R.id.machineView);
-            listView1.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
-            final SubjectAdapter adapter1 = new SubjectAdapter(machineViewList,MainActivity.this);
+            final MultilevelAdapter adapter1 = new MultilevelAdapter(MainActivity.this,machineViewList,machineViewNum);
             listView1.setAdapter(adapter1);
             ListView listView2 = myView.findViewById(R.id.napkinView);
-            listView2.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
-            final ListAdapter adapter2 = new ArrayAdapter<String>(MainActivity.this,R.layout.radio_item,napkinViewList) {
-                @Override
-                public View getView(int position, View convertView, ViewGroup parent) {
-                    final ChoiceView view;
-                    if(convertView == null) {
-                        view = new ChoiceView(MainActivity.this);
-                    }else {
-                        view = (ChoiceView)convertView;
-                    }
-                    view.setText(getItem(position));
-                    return view;
-                }
-            };
+            final MultilevelAdapter2 adapter2 = new MultilevelAdapter2(MainActivity.this,napkinViewList,machineViewNum);
             listView2.setAdapter(adapter2);
-
             ListView listView3 = myView.findViewById(R.id.padView);
-            listView3.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
-            ListAdapter adapter3 = new ArrayAdapter<String>(MainActivity.this,R.layout.radio_item,padViewList) {
+            final MultilevelAdapter3 adapter3 = new MultilevelAdapter3(MainActivity.this,padViewList,machineViewNum);
+            listView3.setAdapter(adapter3);
+            listView1.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
-                public View getView(int position, View convertView, ViewGroup parent) {
-                    final ChoiceView view;
-                    if(convertView == null) {
-                        view = new ChoiceView(MainActivity.this);
-                    }else {
-                        view = (ChoiceView)convertView;
-                    }
-                    view.setText(getItem(position));
-                    return view;
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    MultilevelAdapter.viewHolder viewHolder = (MultilevelAdapter.viewHolder)view.getTag();
+                    adapter2.setClear();
+                    adapter3.setClear();
+                    adapter1.setCheck(position);
+                    machineNum = viewHolder.title.getText().toString();
                 }
-            };
+            });
             listView2.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    adapter1.SetClear();
+                    MultilevelAdapter2.viewHolder viewHolder = (MultilevelAdapter2.viewHolder)view.getTag();
+                    adapter1.setClear();
+                    adapter3.setClear();
+                    adapter2.setCheck(position);
+                    machineNum = viewHolder.title.getText().toString();
                 }
             });
-            listView3.setAdapter(adapter3);
-            alertBuilder.setTitle("机台设置");
-            alertBuilder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+            listView3.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    machineNum = dialogItem[machineIndex];
-                    mHandler.post(updateMachineNum);
-                    replaceMachineNum();
-                    alertDialog2.dismiss();
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    MultilevelAdapter3.viewHolder viewHolder = (MultilevelAdapter3.viewHolder)view.getTag();
+                    adapter1.setClear();
+                    adapter2.setClear();
+                    adapter3.setCheck(position);
+                    machineNum = viewHolder.title.getText().toString();
                 }
             });
+            alertBuilder.setTitle("机台设置");
+            alertBuilder.setPositiveButton("确定", null);
             alertBuilder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     alertDialog2.dismiss();
                 }
             });
+
             alertDialog2 = alertBuilder.create();
             alertDialog2.setView(myView);
+            dismissProgressDialog();
             alertDialog2.show();
+            alertDialog2.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    EditText editText = (EditText)myView.findViewById(R.id.ed_password);
+                    String editPassword = editText.getText().toString();
+                    if (TextUtils.isEmpty(editPassword)) {
+                        Toast toast = Toast.makeText(MainActivity.this,"密码不能为空!",Toast.LENGTH_SHORT);
+                        toast.setGravity(Gravity.CENTER,0,0);
+                        toast.show();
+                    }
+                    if (editPassword.equals(machinePassword)) {
+                        mHandler.post(updateMachineNum);
+                        SharedPreferences preferences = getSharedPreferences("ljl",Context.MODE_PRIVATE);
+                        SharedPreferences.Editor editor = preferences.edit();
+                        editor.putString("machineNum",machineNum);
+                        editor.commit();
+                        replaceMachineNum();
+                        alertDialog2.dismiss();
+                    }else {
+                        Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
+                        toast.setGravity(Gravity.CENTER,0,0);
+                        toast.show();
+                    }
+                }
+            });
+
+
+            WindowManager.LayoutParams layoutParams = alertDialog2.getWindow().getAttributes();
+            WindowManager windowManager = getWindowManager();
+            Display display = windowManager.getDefaultDisplay();
+            layoutParams.width = (int)(display.getWidth() * 0.6);
+            alertDialog2.getWindow().setAttributes(layoutParams);
         }
     };
     Runnable UpdateMachineNumError = new Runnable() {
@@ -477,7 +525,7 @@ public class MainActivity extends AppCompatActivity {
                     Config.registerSmbURLHandler();
                     SmbFile smbFile = new SmbFile(smbPath,auth);
                     SmbFile[] files = smbFile.listFiles();
-                    if (files.length > 0) {
+                    if (files != null&&files.length > 0) {
                         for (SmbFile f : files) {
                             FileEntity entity2 = new FileEntity();
                             boolean isDir =  f.isDirectory();

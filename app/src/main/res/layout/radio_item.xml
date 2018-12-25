@@ -13,13 +13,13 @@
         <RadioButton
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:id="@+id/radio"
+            android:id="@+id/child_radio"
             android:clickable="false"
             android:focusable="false"
             android:focusableInTouchMode="false"
             android:layout_marginLeft="10dp"/>
         <TextView
-            android:id="@+id/text"
+            android:id="@+id/child_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="left"

@@ -14,8 +14,8 @@ public class ChoiceView extends FrameLayout implements Checkable {
     public ChoiceView(Context context) {
         super(context);
         View.inflate(context,R.layout.radio_item,this);
-        mTextView = findViewById(R.id.text);
-        mRadioButton = findViewById(R.id.radio);
+        mTextView = findViewById(R.id.child_text);
+        mRadioButton = findViewById(R.id.child_radio);
     }
     public void setText(String text) {
         mTextView.setText(text);
