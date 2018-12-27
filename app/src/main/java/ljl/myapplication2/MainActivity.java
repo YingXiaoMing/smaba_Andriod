@@ -1,18 +1,23 @@
 package ljl.myapplication2;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
@@ -20,8 +25,11 @@ import android.text.TextUtils;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -87,22 +95,49 @@ public class MainActivity extends AppCompatActivity {
     private AlertDialog alertDialog2; //单选框
     private String[] dialogItem = new String[0];
     private int machineIndex = 0;
-    private String machinePassword;
+    private String machinePassword = "wjbgsnmm"; //初始密码
     private JSONArray machineViewList;
     private JSONArray napkinViewList;
     private JSONArray padViewList;
+    private JSONArray packageViewList;
     private String machineName1 = "尿裤";
     private String machineName2 = "卫生巾";
     private String machineName3 = "护垫";
+    private String machineName4 = "自动包装机";
     @SuppressLint("HandlerLeak")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 //        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        requestWindowFeature(Window.FEATURE_CUSTOM_TITLE);
         setContentView(R.layout.file_activity);
-        String user = "ljl";
-        String pass = "Aa!123456";
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+        getWindow().setFeatureInt(Window.FEATURE_CUSTOM_TITLE,R.layout.titlebar);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (isNetworkConnected(this) == false) {
+            System.out.println("还没检测到网络连接");
+            new AlertDialog.Builder(this)
+                    .setMessage("\r\n" + "连接服务器失败，将导致部分功能无法正常使用，需要到设置页面进行网络连接")
+                    .setPositiveButton("设置", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            Intent intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                            startActivity(intent);
+                        }
+                    })
+                    .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            Toast.makeText(MainActivity.this,"网络连接失败，请重新设置",Toast.LENGTH_SHORT).show();
+                        }
+                    }).show();
+        }
+
+        String user = "AndroidReadSMB";
+        String pass = "Aa!12345";
         auth = new NtlmPasswordAuthentication("",user, pass);
+
+
         machineView = (TextView) findViewById(R.id.machineNum);
         SharedPreferences sharedPreferences = getSharedPreferences("ljl",Context.MODE_PRIVATE);
         String machineName = sharedPreferences.getString("machineNum","");
@@ -134,8 +169,7 @@ public class MainActivity extends AppCompatActivity {
         mList = new ArrayList<>();
         pdfView = findViewById(R.id.pdfView);
         btn_date = findViewById(R.id.btn_date);
-
-        rootPath = "smb://192.168.16.40/ftp/";
+        rootPath = "smb://192.168.16.1/DFSRoot/各部门/新感觉卫生用品厂/生产信息系统数据/";
         Calendar ca = Calendar.getInstance();
         mYear = ca.get(Calendar.YEAR);
         mMonth = ca.get(Calendar.MONTH);
@@ -178,6 +212,34 @@ public class MainActivity extends AppCompatActivity {
                 new DatePickerDialog(MainActivity.this, onDateSetListener, mYear, mMonth, mDay).show();
             }
         });
+        TextView set_btn = (TextView) this.findViewById(R.id.set_btn);
+        set_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                getMachinePassword(rootPath+"config.json");
+                new MaterialDialog.Builder(MainActivity.this)
+                        .title("访问密码")
+                        .inputType(InputType.TYPE_MASK_VARIATION)
+                        .input("", null, new MaterialDialog.InputCallback() {
+                            @Override
+                            public void onInput(@NonNull MaterialDialog dialog, CharSequence input) {
+                                String iString = input.toString();
+                                if (iString.equals(machinePassword)) {
+                                    Intent intent = new Intent();
+                                    intent.setAction(Settings.ACTION_SETTINGS);
+                                    startActivity(intent);
+                                }else {
+                                    Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
+                                    toast.setGravity(Gravity.CENTER,0,0);
+                                    toast.show();
+                                }
+                            }
+                        })
+                        .positiveText("确定")
+                        .negativeText("取消")
+                        .show();
+            }
+        });
         niceSpinner = (NiceSpinner)findViewById(R.id.nice_spinner);
         List<String> dataList = new ArrayList<>();
         dataList.add("白班");
@@ -208,6 +270,18 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    public boolean isNetworkConnected(Context context) {
+     if (context != null) {
+         ConnectivityManager mConnectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+         NetworkInfo mNetworkInfo = mConnectivityManager.getActiveNetworkInfo();
+         if (mNetworkInfo != null) {
+             return mNetworkInfo.isAvailable();
+         }
+     }
+     return false;
+    }
+
     private void connectGetData() {
         getMachineListData(rootPath + "config.txt");
     }
@@ -262,6 +336,29 @@ public class MainActivity extends AppCompatActivity {
         return newFilePath;
     }
 
+    private void getMachinePassword(final  String SPath) {
+        new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                try {
+                    String filePath = smbGet(SPath,auth);
+                    String content = org.apache.commons.io.FileUtils.readFileToString(new File(filePath));
+                    JSONObject jsonObject = JSONObject.fromObject(content);
+                    machinePassword = jsonObject.getString("密码");
+                }catch (Exception e) {
+                    Looper.prepare();
+                    machinePassword = "wjbgsnmm";
+                    Toast toast = Toast.makeText(MainActivity.this, "获取服务器密码失败", Toast.LENGTH_SHORT);
+                    toast.setGravity(Gravity.CENTER,0,0);
+                    toast.show();
+                    Looper.loop();
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+    }
+
     private void getMachineAndPassword(final String jPath) {
         new Thread() {
             @Override
@@ -286,21 +383,23 @@ public class MainActivity extends AppCompatActivity {
                             case 2:
                                 machineName3 = sj.getString("typeName");
                                 padViewList = sj.getJSONArray("child");
+                                break;
+                            case 3:
+                                machineName4 = sj.getString("typeName");
+                                packageViewList = sj.getJSONArray("child");
+                                break;
+                            default:
+                                break;
                         }
                     }
-
-
-
                     machinePassword = (String) jsonObject.get("密码");
-//                    machineViewList = jsonObject.getJSONArray("尿裤");
-//                    napkinViewList = jsonObject.getJSONArray("卫生巾");
-//                    padViewList = jsonObject.getJSONArray("护垫");
                     mHandler.post(createAlertDialog);
                 }catch (Exception e) {
                     Looper.prepare();
                     Toast toast = Toast.makeText(MainActivity.this, "获取服务器密码失败", Toast.LENGTH_SHORT);
                     toast.setGravity(Gravity.CENTER,0,0);
                     toast.show();
+                    dismissProgressDialog();
                     Looper.loop();
                     e.printStackTrace();
                 }
@@ -345,6 +444,8 @@ public class MainActivity extends AppCompatActivity {
             textView2.setText(machineName2);
             TextView textView3 = myView.findViewById(R.id.machineName3);
             textView3.setText(machineName3);
+            TextView textView4 = myView.findViewById(R.id.machineName4);
+            textView4.setText(machineName4);
             ListView listView1 = myView.findViewById(R.id.machineView);
             final MultilevelAdapter adapter1 = new MultilevelAdapter(MainActivity.this,machineViewList,machineViewNum);
             listView1.setAdapter(adapter1);
@@ -354,12 +455,16 @@ public class MainActivity extends AppCompatActivity {
             ListView listView3 = myView.findViewById(R.id.padView);
             final MultilevelAdapter3 adapter3 = new MultilevelAdapter3(MainActivity.this,padViewList,machineViewNum);
             listView3.setAdapter(adapter3);
+            ListView listView4 = myView.findViewById(R.id.packageView);
+            final MultilevelAdapter4 adapter4 = new MultilevelAdapter4(MainActivity.this,packageViewList,machineViewNum);
+            listView4.setAdapter(adapter4);
             listView1.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                     MultilevelAdapter.viewHolder viewHolder = (MultilevelAdapter.viewHolder)view.getTag();
                     adapter2.setClear();
                     adapter3.setClear();
+                    adapter4.setClear();
                     adapter1.setCheck(position);
                     machineNum = viewHolder.title.getText().toString();
                 }
@@ -370,6 +475,7 @@ public class MainActivity extends AppCompatActivity {
                     MultilevelAdapter2.viewHolder viewHolder = (MultilevelAdapter2.viewHolder)view.getTag();
                     adapter1.setClear();
                     adapter3.setClear();
+                    adapter4.setClear();
                     adapter2.setCheck(position);
                     machineNum = viewHolder.title.getText().toString();
                 }
@@ -380,7 +486,19 @@ public class MainActivity extends AppCompatActivity {
                     MultilevelAdapter3.viewHolder viewHolder = (MultilevelAdapter3.viewHolder)view.getTag();
                     adapter1.setClear();
                     adapter2.setClear();
+                    adapter4.setClear();
                     adapter3.setCheck(position);
+                    machineNum = viewHolder.title.getText().toString();
+                }
+            });
+            listView4.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    MultilevelAdapter4.viewHolder viewHolder = (MultilevelAdapter4.viewHolder)view.getTag();
+                    adapter1.setClear();
+                    adapter2.setClear();
+                    adapter3.setClear();
+                    adapter4.setCheck(position);
                     machineNum = viewHolder.title.getText().toString();
                 }
             });
@@ -400,14 +518,14 @@ public class MainActivity extends AppCompatActivity {
             alertDialog2.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    EditText editText = (EditText)myView.findViewById(R.id.ed_password);
-                    String editPassword = editText.getText().toString();
-                    if (TextUtils.isEmpty(editPassword)) {
-                        Toast toast = Toast.makeText(MainActivity.this,"密码不能为空!",Toast.LENGTH_SHORT);
-                        toast.setGravity(Gravity.CENTER,0,0);
-                        toast.show();
-                    }
-                    if (editPassword.equals(machinePassword)) {
+//                    EditText editText = (EditText)myView.findViewById(R.id.ed_password);
+//                    String editPassword = editText.getText().toString();
+//                    if (TextUtils.isEmpty(editPassword)) {
+//                        Toast toast = Toast.makeText(MainActivity.this,"密码不能为空!",Toast.LENGTH_SHORT);
+//                        toast.setGravity(Gravity.CENTER,0,0);
+//                        toast.show();
+//                    }
+//                    if (editPassword.equals(machinePassword)) {
                         mHandler.post(updateMachineNum);
                         SharedPreferences preferences = getSharedPreferences("ljl",Context.MODE_PRIVATE);
                         SharedPreferences.Editor editor = preferences.edit();
@@ -415,11 +533,11 @@ public class MainActivity extends AppCompatActivity {
                         editor.commit();
                         replaceMachineNum();
                         alertDialog2.dismiss();
-                    }else {
-                        Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
-                        toast.setGravity(Gravity.CENTER,0,0);
-                        toast.show();
-                    }
+//                    }else {
+//                        Toast toast = Toast.makeText(MainActivity.this,"密码错误",Toast.LENGTH_SHORT);
+//                        toast.setGravity(Gravity.CENTER,0,0);
+//                        toast.show();
+//                    }
                 }
             });
 
@@ -476,11 +594,13 @@ public class MainActivity extends AppCompatActivity {
     private DatePickerDialog.OnDateSetListener onDateSetListener = new DatePickerDialog.OnDateSetListener() {
         @Override
         public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
-            mYear = year;
-            mMonth = month;
-            mDay = dayOfMonth;
-            transferNewDate(mYear,mMonth,mDay);
-            replaceMachineNum();
+            if (view.isShown()) {
+                mYear = year;
+                mMonth = month;
+                mDay = dayOfMonth;
+                transferNewDate(mYear,mMonth,mDay);
+                replaceMachineNum();
+            }
         }
     };
     private void getData(final String newPath) {

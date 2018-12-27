@@ -49,10 +49,22 @@
                     android:text="护垫"
                     android:gravity="center"/>
             </LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_weight="1.0"
+                android:layout_height="40dp"
+                android:background="@drawable/border">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:id="@+id/machineName4"
+                    android:text="自动包装机"
+                    android:gravity="center"/>
+            </LinearLayout>
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="330dp"
+            android:layout_height="450dp"
             android:orientation="horizontal">
             <LinearLayout
                 android:layout_width="0dp"
@@ -84,25 +96,18 @@
                     android:layout_weight="1"
                     android:id="@+id/padView"></ListView>
             </LinearLayout>
-
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="20dp"
-                android:text="密码:"/>
-            <EditText
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="请输入密码"
-                android:inputType="textPassword"
-                android:id="@+id/ed_password"/>
+                android:layout_weight="1.0"
+                android:layout_height="match_parent">
+                <ListView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:id="@+id/packageView"></ListView>
+            </LinearLayout>
         </LinearLayout>
+
 
     </LinearLayout>
 </android.support.constraint.ConstraintLayout>
